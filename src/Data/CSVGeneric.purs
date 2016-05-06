@@ -39,29 +39,8 @@ matchEnum constructors = oneOf (map step constructors)
     fullConstructorName = constructor.sigConstructor
     constructorName = Unsafe.last $ split "." $ fullConstructorName
 
-genericRead :: forall a. Generic a => String -> Proxy a -> Maybe a
-genericRead s p =
-  case (toSignature p) of
-    (SigProd _ cs) -> oneOf (map step cs)
-    _ -> Nothing
- where
-  step constructor = do
-    -- leave only last part of constructor ie. Main.Foo -> Foo
-    let fullConstructorName = constructor.sigConstructor
-    constructorName <- last <<< split "." $ fullConstructorName
-    if constructorName == s
-      -- this example only works for construcotrs of kind `*`
-      then fromSpine $ SProd fullConstructorName []
-      else Nothing
-           
-
--- this helper will be available in purescript-foldable-traversable 1.0
 oneOf :: forall f g a. (Foldable f, Plus g) => f (g a) -> g a
-oneOf = foldr alt empty
-
-
-
-
+oneOf = foldr alt empty 
 
 --parseCSV pa s = ?what
 fullParse :: forall a. (Generic a) => Array String -> Proxy a -> Parser (Maybe a)

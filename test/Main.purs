@@ -47,14 +47,6 @@ main = do
   log $ genericShowPrec 0 $ getResult (P.parse px $ stream "5se")
   let px' = fullParse' ["int", "char", "bool"]  (Proxy :: Proxy Primitives)
   log $ genericShowPrec 0 $ getResult ((P.parse px' $ stream "5,3,false") :: ParseResult GenericSpine)
-  log "fon"
-  log $ show $ (fromSpine $ SProd "Main.Simple"
-                [\_ -> SRecord [{ recLabel : "foo",
-                                  recValue : \_ -> SString "5se"}] ]) :: Maybe Simple
-  log $ show $ (fromSpine $ SProd "Main.Primitives"
-                [\_ -> SRecord [{ recLabel : "bool", recValue : \_ -> SBoolean false  }
-                              , { recLabel : "char", recValue : \_ -> SChar 'a'}
-                       , { recLabel : "int", recValue : \_ -> SInt 3 }  ]] ) :: Maybe Primitives
   let px'' = fullParse ["int", "char", "bool"]  (Proxy :: Proxy Primitives)
   log $ showResult <$> P.parse px'' $ stream "5,3,false,a"
                                                                             
