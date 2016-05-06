@@ -3,6 +3,7 @@ import Data.CSVGeneric
 import Prelude
 import Data.Traversable (sequence)
 import Data.Maybe (fromMaybe, maybe, Maybe(Nothing, Just))
+import Data.String (joinWith, split)
 import Data.Eulalie.Result (ParseResult(Success, Error))
 import Data.Eulalie.Stream (stream)
 import Data.Eulalie.Success (ParseSuccess)
@@ -11,7 +12,15 @@ import Control.Bind ((=<<), join)
 import Control.Monad.Eff.Console (log, CONSOLE)
 import Data.Eulalie.Parser as P
 import Type.Proxy (Proxy(Proxy))
-
+import Data.Array as A 
+newtype WithEnum = WithEnum { enum1 :: AnEnum, enum2 :: AnEnum }
+data AnEnum = X | Y | Z
+derive instance gerericAnEnum :: Generic AnEnum
+instance showAnEnum :: Show AnEnum where
+  show = gShow
+derive instance gerericWithEnum :: Generic WithEnum
+instance showWithEnum :: Show WithEnum where
+  show = gShow
 --main :: forall e. Eff (console :: CONSOLE | e) Unit
 main = do
   let p = Proxy :: (Proxy Something)
@@ -49,6 +58,9 @@ main = do
   let px'' = fullParse ["int", "char", "bool"]  (Proxy :: Proxy Primitives)
   log $ showResult <$> P.parse px'' $ stream "5,3,false,a"
                                                                             
+  let enump = fullParse ["enum1","enum2"]  (Proxy :: Proxy WithEnum)
+  log "?????"
+  log $ showResult <$> P.parse enump $ stream "Z,X"
        
 --  log $ show $ fromJust $ getResult x2
 pi = fullParse ["int"] (Proxy :: Proxy JustInt)
@@ -85,3 +97,19 @@ newtype Primitives = Primitives { int :: Int
 derive instance gerericPrimitives :: Generic Primitives
 instance showPrimitives :: Show Primitives where
   show = gShow
+
+genericShowPrec :: Int -> GenericSpine -> String
+genericShowPrec d (SProd s arr) =
+    if A.null arr
+    then s
+    else showParen (d > 10) $ s <> " " <> joinWith " " (map (\x -> genericShowPrec 11 (x unit)) arr)
+  where showParen false x = x
+        showParen true  x = "(" <> x <> ")"
+
+genericShowPrec d (SRecord xs) = "{" <> joinWith ", " (map (\x -> x.recLabel <> ": " <> genericShowPrec 0 (x.recValue unit)) xs) <> "}"
+genericShowPrec d (SBoolean x) = show x
+genericShowPrec d (SInt x)     = show x
+genericShowPrec d (SNumber x)  = show x
+genericShowPrec d (SString x)  = show x
+genericShowPrec d (SChar x)    = show x
+genericShowPrec d (SArray xs)  = "[" <> joinWith ", "  (map (\x -> genericShowPrec 0 (x unit)) xs) <> "]"

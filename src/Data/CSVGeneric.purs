@@ -30,6 +30,14 @@ import Type.Proxy (Proxy(Proxy))
   
 fromShow a = S.string (show a) *> (P.succeed a)
 
+matchEnum ::  Array DataConstructor -> Parser GenericSpine
+matchEnum constructors = oneOf (map step constructors)
+ where
+  step :: DataConstructor -> Parser GenericSpine
+  step constructor = (flip SProd []) <$> S.string constructorName 
+   where
+    fullConstructorName = constructor.sigConstructor
+    constructorName = Unsafe.last $ split "." $ fullConstructorName
 
 genericRead :: forall a. Generic a => String -> Proxy a -> Maybe a
 genericRead s p =
@@ -133,9 +141,9 @@ sigToSpine (SigProd "Data.Maybe.Maybe" arr) = nothingCase <|> justCase
     justCase = do
       x <- sigToSpine $ force $ Unsafe.head (Unsafe.head arr).sigValues
       pure $ SProd "Data.Maybe.Just" [\_ -> x]
-sigToSpine (SigProd _ arr) = P.fail -- read case
-sigToSpine (SigArray  _) = P.fail
-sigToSpine (SigRecord _) = P.fail
+sigToSpine (SigProd _ arr) = matchEnum arr
+sigToSpine (SigArray  _)   = P.fail
+sigToSpine (SigRecord _)   = P.fail
 
 
 --SArray (Array (Unit -> GenericSpine))
@@ -147,18 +155,3 @@ sigToSpine (SigRecord _) = P.fail
 --SRecord (Array { recLabel :: String, recValue :: Unit -> GenericSpine })
 --SProd String (Array (Unit -> GenericSpine))
 
-genericShowPrec :: Int -> GenericSpine -> String
-genericShowPrec d (SProd s arr) =
-    if A.null arr
-    then s
-    else showParen (d > 10) $ s <> " " <> joinWith " " (map (\x -> genericShowPrec 11 (x unit)) arr)
-  where showParen false x = x
-        showParen true  x = "(" <> x <> ")"
-
-genericShowPrec d (SRecord xs) = "{" <> joinWith ", " (map (\x -> x.recLabel <> ": " <> genericShowPrec 0 (x.recValue unit)) xs) <> "}"
-genericShowPrec d (SBoolean x) = show x
-genericShowPrec d (SInt x)     = show x
-genericShowPrec d (SNumber x)  = show x
-genericShowPrec d (SString x)  = show x
-genericShowPrec d (SChar x)    = show x
-genericShowPrec d (SArray xs)  = "[" <> joinWith ", "  (map (\x -> genericShowPrec 0 (x unit)) xs) <> "]"
