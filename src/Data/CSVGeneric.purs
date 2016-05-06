@@ -7,6 +7,7 @@ import Data.Eulalie.Char as C
 import Data.Eulalie.Parser as P
 import Data.Eulalie.String as S
 import Data.Int as Int
+import Data.Functor
 import Control.Alt ((<|>), alt)
 import Control.Apply ((<*), (*>))
 import Control.Bind ((=<<), join)
@@ -34,7 +35,7 @@ matchEnum ::  Array DataConstructor -> Parser GenericSpine
 matchEnum constructors = oneOf (map step constructors)
  where
   step :: DataConstructor -> Parser GenericSpine
-  step constructor = (flip SProd []) <$> S.string constructorName 
+  step constructor = (SProd fullConstructorName []) <$ S.string constructorName 
    where
     fullConstructorName = constructor.sigConstructor
     constructorName = Unsafe.last $ split "." $ fullConstructorName

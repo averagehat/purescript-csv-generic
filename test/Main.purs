@@ -24,9 +24,6 @@ instance showWithEnum :: Show WithEnum where
 --main :: forall e. Eff (console :: CONSOLE | e) Unit
 main = do
   let p = Proxy :: (Proxy Something)
-  log <<< show <<< genericRead "Foo" $ p
-  log <<< show <<< genericRead "Bar" $ p
-  log <<< show <<< genericRead "Baz" $ p
   let x  = fromArray (Proxy :: Proxy Simple) [{ recLabel : "foo", recValue : \_ -> (SString "Foo!")}] 
   log $ show x
   log $ show $ toSignature (Proxy :: Proxy (Maybe Int))
@@ -48,10 +45,8 @@ main = do
   let px' = fullParse' ["int", "char", "bool"]  (Proxy :: Proxy Primitives)
   log $ genericShowPrec 0 $ getResult ((P.parse px' $ stream "5,3,false") :: ParseResult GenericSpine)
   let px'' = fullParse ["int", "char", "bool"]  (Proxy :: Proxy Primitives)
-  log $ showResult <$> P.parse px'' $ stream "5,3,false,a"
-                                                                            
+  log $ showResult <$> P.parse px'' $ stream "5,3,false,a" 
   let enump = fullParse ["enum1","enum2"]  (Proxy :: Proxy WithEnum)
-  log "?????"
   log $ showResult <$> P.parse enump $ stream "Z,X"
        
 --  log $ show $ fromJust $ getResult x2
