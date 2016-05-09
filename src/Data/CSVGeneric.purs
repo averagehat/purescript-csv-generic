@@ -8,6 +8,7 @@ import Data.Eulalie.Parser as P
 import Data.Eulalie.String as S
 import Data.Int as Int
 import Data.Functor
+import Data.Either
 import Control.Alt ((<|>), alt)
 import Control.Apply ((<*), (*>))
 import Control.Bind ((=<<), join)
@@ -44,8 +45,9 @@ oneOf :: forall f g a. (Foldable f, Plus g) => f (g a) -> g a
 oneOf = foldr alt empty 
 
 --parseCSV pa s = ?what
-fullParse :: forall a. (Generic a) => Array String -> Proxy a -> Parser (Maybe a)
-fullParse h x = fromSpine <$> (fullParse' h x)
+eitherFromSpine x = maybe (Left $ genericShowPrec 0 x) Right $ fromSpine x
+fullParse :: forall a. (Generic a) => Array String -> Proxy a -> Parser (Either String a)
+fullParse h x = eitherFromSpine <$> (fullParse' h x)
 fullParse' :: forall a. (Generic a) => Array String -> Proxy a -> Parser GenericSpine
 fullParse' header p = do
   fields <- parse
@@ -112,12 +114,10 @@ sigToSpine SigChar     =  SChar <$> P.item
 sigToSpine SigString   =  SString <$> (C.many P.item)
 sigToSpine SigInt      =  SInt <$> toInt
 sigToSpine SigBoolean  =  SBoolean <$> (fromShow true <|> fromShow false) 
-sigToSpine (SigProd "Data.Maybe.Maybe" arr) = nothingCase <|> justCase
+sigToSpine (SigProd "Data.Maybe.Maybe" arr) = justCase <|> nothingCase -- this ordering matters!
   where
-    nothingCase = do
-      x <- C.many P.item
-      when (x /= "") P.fail
-      pure $ SProd "Data.Maybe.Nothing" []
+    nothingSpine = SProd "Data.Maybe.Nothing" []
+    nothingCase = (P.eof $> nothingSpine) <|> ((S.string "") $> nothingSpine) 
     justCase = do
       x <- sigToSpine $ force $ Unsafe.head (Unsafe.head arr).sigValues
       pure $ SProd "Data.Maybe.Just" [\_ -> x]
@@ -135,3 +135,19 @@ sigToSpine (SigRecord _)   = P.fail
 --SRecord (Array { recLabel :: String, recValue :: Unit -> GenericSpine })
 --SProd String (Array (Unit -> GenericSpine))
 
+
+genericShowPrec :: Int -> GenericSpine -> String
+genericShowPrec d (SProd s arr) =
+    if A.null arr
+    then s
+    else showParen (d > 10) $ s <> " " <> joinWith " " (map (\x -> genericShowPrec 11 (x unit)) arr)
+  where showParen false x = x
+        showParen true  x = "(" <> x <> ")"
+
+genericShowPrec d (SRecord xs) = "{" <> joinWith ", " (map (\x -> x.recLabel <> ": " <> genericShowPrec 0 (x.recValue unit)) xs) <> "}"
+genericShowPrec d (SBoolean x) = show x
+genericShowPrec d (SInt x)     = show x
+genericShowPrec d (SNumber x)  = show x
+genericShowPrec d (SString x)  = show x
+genericShowPrec d (SChar x)    = show x
+genericShowPrec d (SArray xs)  = "[" <> joinWith ", "  (map (\x -> genericShowPrec 0 (x unit)) xs) <> "]"
