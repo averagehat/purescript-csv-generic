@@ -111,7 +111,7 @@ toInt = do
   
 sigToSpine :: GenericSignature -> Parser GenericSpine
 sigToSpine SigChar     =  SChar <$> P.item
-sigToSpine SigString   =  SString <$> (C.many $ S.notChar ',')
+sigToSpine SigString   =  SString <$> (C.many1 $ C.notChar ',')
 sigToSpine SigInt      =  SInt <$> toInt
 sigToSpine SigBoolean  =  SBoolean <$> (fromShow true <|> fromShow false) 
 sigToSpine (SigProd "Data.Maybe.Maybe" arr) = justCase <|> nothingCase -- this ordering matters!
