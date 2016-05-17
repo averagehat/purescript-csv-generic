@@ -4,10 +4,12 @@ import Prelude
 import Data.Either
 import Data.Generic
 import Data.Array as A
+import Data.String as S
 import Data.Eulalie.Parser as P
 import Control.Bind ((=<<), join)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Console (log, CONSOLE)
+import Data.Either.Unsafe (fromRight)
 import Data.Eulalie.Result (ParseResult(Success, Error))
 import Data.Eulalie.Stream (stream)
 import Data.Eulalie.Success (ParseSuccess)
@@ -15,11 +17,13 @@ import Data.Maybe (fromMaybe, maybe, Maybe(Nothing, Just))
 import Data.String (joinWith, split)
 import Data.Traversable (sequence)
 import Type.Proxy (Proxy(Proxy))
+
 newtype WithEnum = WithEnum { enum1 :: AnEnum, enum2 :: AnEnum }
 data AnEnum = X | Y | Z
 derive instance gerericAnEnum :: Generic AnEnum
 instance showAnEnum :: Show AnEnum where
   show = gShow
+  
 derive instance gerericWithEnum :: Generic WithEnum
 instance showWithEnum :: Show WithEnum where
   show = gShow
@@ -64,6 +68,8 @@ main = do
   log $ showResult $ P.parse mp $ stream ",,," -- Right (WithMaybe { int : })
   log $ showResult $ P.parse mp $ stream "a,,X" -- Left failure
   log $ showResult $ P.parse mp $ stream "12," -- Left failure
+  log $ fromRight $ encode "," (Proxy :: Proxy WithMaybe) [WithMaybe { int: (Just 12), ms: (Just 14), me: Nothing} ]
+  log $ show $ encode "," (Proxy :: Proxy WithMaybe) [WithMaybe { int: (Just 12), ms: (Just 14), me: (Just X)} ]
        
 getResult (Success r) = r.value
 showLabels x = "reclabel : " <> x.recLabel <> "recValue : " <> (show $ force x.recValue)
@@ -92,7 +98,6 @@ instance showJustInt :: Show JustInt where
 newtype Primitives = Primitives { int :: Int
                                 , char :: Char
                                 , bool :: Boolean}
-
 -- for sum types just pick based on which field names match the headers.
 
 derive instance gerericPrimitives :: Generic Primitives

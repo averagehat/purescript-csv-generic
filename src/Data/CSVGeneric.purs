@@ -1,16 +1,16 @@
 module Data.CSVGeneric where 
 import Data.Generic
 import Prelude
+import Data.Functor
+import Data.Either
 import Data.Array as A
 import Data.Array.Unsafe as Unsafe
 import Data.Eulalie.Char as C
 import Data.Eulalie.Parser as P
 import Data.Eulalie.String as S
 import Data.Int as Int
-import Data.Functor
-import Data.Either
 import Control.Alt ((<|>), alt)
-import Control.Apply ((<*), (*>))
+import Control.Apply ((<*), (*>), lift2)
 import Control.Bind ((=<<), join)
 import Control.Monad (when)
 import Control.Monad.Eff (Eff)
@@ -20,7 +20,7 @@ import Data.Eulalie.Parser (Parser)
 import Data.Eulalie.Result (ParseResult(Success, Error))
 import Data.Eulalie.Stream (stream)
 import Data.Eulalie.Success (ParseSuccess)
-import Data.Foldable (fold, class Foldable, foldr)
+import Data.Foldable (intercalate, fold, class Foldable, foldr)
 import Data.Maybe (fromMaybe, maybe, Maybe(Nothing, Just))
 import Data.Maybe.Unsafe (fromJust)
 import Data.Monoid (mempty)
@@ -28,18 +28,16 @@ import Data.String (joinWith, split)
 import Data.Traversable (sequence)
 import Data.Tuple (snd, fst, Tuple(Tuple))
 import Type.Proxy (Proxy(Proxy))
-
-  
 fromShow a = S.string (show a) *> (P.succeed a)
 
 matchEnum ::  Array DataConstructor -> Parser GenericSpine
 matchEnum constructors = oneOf (map step constructors)
  where
   step :: DataConstructor -> Parser GenericSpine
-  step constructor = (SProd fullConstructorName []) <$ S.string constructorName 
+  step constructor = (SProd fullConstructorName []) <$ S.string constructorName'
    where
     fullConstructorName = constructor.sigConstructor
-    constructorName = Unsafe.last $ split "." $ fullConstructorName
+    constructorName' = Unsafe.last $ split "." $ fullConstructorName
 
 oneOf :: forall f g a. (Foldable f, Plus g) => f (g a) -> g a
 oneOf = foldr alt empty 
@@ -125,6 +123,46 @@ sigToSpine (SigProd _ arr) = matchEnum arr
 sigToSpine (SigArray  _)   = P.fail
 sigToSpine (SigRecord _)   = P.fail
 
+
+
+-- need to use proxy for the columns because our input array may be empty
+
+
+encode :: forall a. Generic a => String -> Proxy a -> Array a -> Either Error String
+encode sep p as = unlines <$> map (intercalate sep) <$> encode' p as
+  where unlines = intercalate "\n"
+
+encode' :: forall a. Generic a => Proxy a -> Array a -> Either Error (Array (Array String))
+encode' p as = sequence $ [names] <> (map (vals <<< toSpine) as)
+  where
+    arr = (\(SigProd _ arr') -> arr') $ toSignature p
+    sr = force $ Unsafe.head (Unsafe.head arr).sigValues
+    recs (SigRecord recs') = Right recs'
+    recs _ = Left "was not sigrecrord" 
+    names = (map _.recLabel) <$> recs sr
+
+vals :: GenericSpine -> Either Error (Array String)
+vals (SProd _ arr) = row recs
+  where
+    recs = (\(SRecord arr') -> arr') $ force $ Unsafe.head arr
+    row = sequence <<< map (encode'' <<< force <<< _.recValue)
+        
+type Error = String
+
+-- TODO: how to handle Enum; not using its show instance, we have to drop the
+-- dot parts. hmm. need to provide an Encode typeclass.
+encode'' :: GenericSpine -> Either Error String
+encode'' (SProd "Data.Maybe.Nothing" _) = Right ""
+encode'' (SProd "Data.Maybe.Just" arr)  = encode'' $ force $ Unsafe.head arr
+encode'' (SProd s arr)  = if (not $ A.null arr) then Left "SProd length must be simple \"enum\"." else Right $ undot s
+ where undot s = fromMaybe "" $ A.last $ split "." s
+encode'' (SRecord xs) = Left "No SRecord"
+encode'' (SBoolean x) = Right $ show x
+encode'' (SInt x)     = Right $ show x
+encode'' (SNumber x)  = Right $ show x
+encode'' (SString x)  = Right $ show x
+encode'' (SChar x)    = Right $ show x
+encode'' (SArray xs)  = Left "No array"
 
 --SArray (Array (Unit -> GenericSpine))
 --SChar Char
